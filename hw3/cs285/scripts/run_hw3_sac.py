@@ -1,6 +1,7 @@
 import os
 import time
 import yaml
+from collections import deque
 
 from cs285.agents.soft_actor_critic import SoftActorCritic
 from cs285.infrastructure.replay_buffer import ReplayBuffer
@@ -52,7 +53,6 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
     else:
         fps = env.env.metadata["render_fps"]
 
-    # initialize agent
     agent = SoftActorCritic(
         ob_shape,
         ac_dim,
@@ -63,14 +63,19 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
 
     observation = env.reset()
 
+    recent_returns = deque(maxlen=100)
+    recent_ep_lens = deque(maxlen=100)
+    num_episodes = 0
+    start_time = time.time()
+    last_sps_step = 0
+    last_sps_time = start_time
+
     for step in tqdm.trange(config["total_steps"], dynamic_ncols=True):
         if step < config["random_steps"]:
             action = env.action_space.sample()
         else:
-            # TODO(student): Select an action
             action = agent.get_action(observation)
 
-        # Step the environment and add the data to the replay buffer
         next_observation, reward, done, info = env.step(action)
         replay_buffer.insert(
             observation=observation,
@@ -81,30 +86,43 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
         )
 
         if done:
-            logger.log_scalar(info["episode"]["r"], "train_return", step)
-            logger.log_scalar(info["episode"]["l"], "train_ep_len", step)
+            ep_return = float(info["episode"]["r"])
+            ep_length = float(info["episode"]["l"])
+            recent_returns.append(ep_return)
+            recent_ep_lens.append(ep_length)
+            num_episodes += 1
+
+            logger.log_scalar(ep_return, "train_return", step)
+            logger.log_scalar(ep_length, "train_ep_len", step)
+            logger.log_scalar(num_episodes, "num_episodes", step)
+            logger.log_scalar(np.mean(recent_returns), "train_return_avg100", step)
+            logger.log_scalar(np.mean(recent_ep_lens), "train_ep_len_avg100", step)
+
             observation = env.reset()
         else:
             observation = next_observation
 
         # Train the agent
         if step >= config["training_starts"]:
-            # TODO(student): Sample a batch of config["batch_size"] transitions from the replay buffer
             batch = replay_buffer.sample(config["batch_size"])
             batch = ptu.from_numpy(batch)
             update_info = agent.update(**batch, step=step)
 
-            # Logging
             update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
             update_info["critic_lr"] = agent.critic_lr_scheduler.get_last_lr()[0]
 
             if step % args.log_interval == 0:
                 for k, v in update_info.items():
                     logger.log_scalar(v, k, step)
-                    logger.log_scalars
+                logger.log_scalar(len(replay_buffer), "replay_buffer_size", step)
+                now = time.time()
+                sps = (step - last_sps_step) / max(now - last_sps_time, 1e-6)
+                logger.log_scalar(sps, "steps_per_sec", step)
+                logger.log_scalar(now - start_time, "wall_time_sec", step)
+                last_sps_step = step
+                last_sps_time = now
                 logger.flush()
 
-        # Run evaluation
         if step % args.eval_interval == 0:
             trajectories = utils.sample_n_trajectories(
                 eval_env,
@@ -143,6 +161,8 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
                     video_title="eval_rollouts",
                 )
 
+    logger.finish()
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -157,13 +177,22 @@ def main():
     parser.add_argument("--which_gpu", "-g", default=0)
     parser.add_argument("--log_interval", type=int, default=1000)
 
+    # Weights & Biases integration
+    parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--wandb_project", type=str, default="cs285-hw3-sac")
+    parser.add_argument("--wandb_entity", type=str, default=None)
+    parser.add_argument("--wandb_group", type=str, default=None,
+                        help="Optional group name for organising related runs.")
+    parser.add_argument("--wandb_mode", type=str, default="online",
+                        choices=["online", "offline", "disabled"])
+
     args = parser.parse_args()
 
     # create directory for logging
     logdir_prefix = "hw3_sac_"  # keep for autograder
 
     config = make_config(args.config_file)
-    logger = make_logger(logdir_prefix, config)
+    logger = make_logger(logdir_prefix, config, args=args, config_file=args.config_file)
 
     run_training_loop(config, logger, args)
 

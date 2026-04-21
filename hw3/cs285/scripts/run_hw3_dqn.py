@@ -1,5 +1,6 @@
 import time
 import argparse
+from collections import deque
 
 from cs285.agents.dqn_agent import DQNAgent
 import cs285.env_configs
@@ -87,22 +88,24 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
 
     reset_env_training()
 
+    # Training bookkeeping (rolling stats for nicer wandb plots)
+    recent_returns = deque(maxlen=100)
+    recent_ep_lens = deque(maxlen=100)
+    num_episodes = 0
+    start_time = time.time()
+    last_sps_step = 0
+    last_sps_time = start_time
+
     for step in tqdm.trange(config["total_steps"], dynamic_ncols=True):
         epsilon = exploration_schedule.value(step)
-        
-        # TODO(student): Compute action
-        action = agent.get_action(observation, epsilon)
 
-        # TODO(student): Step the environment
+        action = agent.get_action(observation, epsilon)
         next_observation, reward, done, info = env.step(action)
 
         next_observation = np.asarray(next_observation)
         truncated = info.get("TimeLimit.truncated", False)
 
-        # TODO(student): Add the data to the replay buffer
         if isinstance(replay_buffer, MemoryEfficientReplayBuffer):
-            # We're using the memory-efficient replay buffer,
-            # so we only insert next_observation (not observation)
             replay_buffer.insert(
                 action=action,
                 reward=reward,
@@ -110,7 +113,6 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
                 done=done and not truncated,
             )
         else:
-            # We're using the regular replay buffer
             replay_buffer.insert(
                 observation=observation,
                 action=action,
@@ -119,37 +121,45 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
                 done=done and not truncated,
             )
 
-        # Handle episode termination
         if done:
             reset_env_training()
+            ep_return = float(info["episode"]["r"])
+            ep_length = float(info["episode"]["l"])
+            recent_returns.append(ep_return)
+            recent_ep_lens.append(ep_length)
+            num_episodes += 1
 
-            logger.log_scalar(info["episode"]["r"], "train_return", step)
-            logger.log_scalar(info["episode"]["l"], "train_ep_len", step)
+            logger.log_scalar(ep_return, "train_return", step)
+            logger.log_scalar(ep_length, "train_ep_len", step)
+            logger.log_scalar(num_episodes, "num_episodes", step)
+            logger.log_scalar(np.mean(recent_returns), "train_return_avg100", step)
+            logger.log_scalar(np.mean(recent_ep_lens), "train_ep_len_avg100", step)
         else:
             observation = next_observation
 
         # Main DQN training loop
         if step >= config["learning_starts"]:
-            # TODO(student): Sample config["batch_size"] samples from the replay buffer
             batch = replay_buffer.sample(config["batch_size"])
-
-            # Convert to PyTorch tensors
             batch = ptu.from_numpy(batch)
-
-            # TODO(student): Train the agent. `batch` is a dictionary of numpy arrays,
             update_info = agent.update(**batch, step=step)
 
-            # Logging code
             update_info["epsilon"] = epsilon
             update_info["lr"] = agent.lr_scheduler.get_last_lr()[0]
 
             if step % args.log_interval == 0:
                 for k, v in update_info.items():
                     logger.log_scalar(v, k, step)
+                # Extra diagnostics
+                logger.log_scalar(len(replay_buffer), "replay_buffer_size", step)
+                now = time.time()
+                sps = (step - last_sps_step) / max(now - last_sps_time, 1e-6)
+                logger.log_scalar(sps, "steps_per_sec", step)
+                logger.log_scalar(now - start_time, "wall_time_sec", step)
+                last_sps_step = step
+                last_sps_time = now
                 logger.flush()
 
         if step % args.eval_interval == 0:
-            # Evaluate
             trajectories = utils.sample_n_trajectories(
                 eval_env,
                 agent,
@@ -187,6 +197,8 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
                     video_title="eval_rollouts",
                 )
 
+    logger.finish()
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -201,13 +213,22 @@ def main():
     parser.add_argument("--which_gpu", "-gpu_id", default=7)
     parser.add_argument("--log_interval", type=int, default=1000)
 
+    # Weights & Biases integration
+    parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--wandb_project", type=str, default="cs285-hw3-dqn")
+    parser.add_argument("--wandb_entity", type=str, default=None)
+    parser.add_argument("--wandb_group", type=str, default=None,
+                        help="Optional group name for organising related runs.")
+    parser.add_argument("--wandb_mode", type=str, default="online",
+                        choices=["online", "offline", "disabled"])
+
     args = parser.parse_args()
 
     # create directory for logging
     logdir_prefix = "hw3_dqn_"  # keep for autograder
 
     config = make_config(args.config_file)
-    logger = make_logger(logdir_prefix, config)
+    logger = make_logger(logdir_prefix, config, args=args, config_file=args.config_file)
 
     run_training_loop(config, logger, args)
 

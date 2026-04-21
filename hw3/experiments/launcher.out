@@ -1,0 +1,60 @@
+==================================================================
+hw3 training launcher
+  log dir      : /data/wmz5132/cs285-study/hw3/experiments/launch_logs/20260420_221318
+  GPUS         : 4 5 6 7
+  JOBS_PER_GPU : 3
+  SEEDS        : 1 2 3
+  INCLUDE_LONG : 1
+  WANDB_MODE   : online
+  num tasks    : 45
+==================================================================
+[slot 0 | gpu 4] -> dqn__cartpole__seed1
+[slot 1 | gpu 4] -> dqn__cartpole__seed2
+[slot 2 | gpu 4] -> dqn__cartpole__seed3
+[slot 3 | gpu 5] -> dqn__lunarlander__seed1
+[slot 4 | gpu 5] -> dqn__lunarlander__seed2
+[slot 5 | gpu 5] -> dqn__lunarlander__seed3
+[slot 6 | gpu 6] -> dqn__lunarlander_doubleq__seed1
+[slot 7 | gpu 6] -> dqn__lunarlander_doubleq__seed2
+[slot 8 | gpu 6] -> dqn__lunarlander_doubleq__seed3
+[slot 9 | gpu 7] -> sac__sanity_pendulum__seed1
+[slot 10 | gpu 7] -> sac__sanity_pendulum__seed2
+[slot 11 | gpu 7] -> sac__sanity_pendulum__seed3
+[slot 2 | gpu 4] -> sac__sanity_invertedpendulum_reinforce__seed1
+[slot 0 | gpu 4] -> sac__sanity_invertedpendulum_reinforce__seed2
+[slot 1 | gpu 4] -> sac__sanity_invertedpendulum_reinforce__seed3
+[slot 7 | gpu 6] -> sac__sanity_invertedpendulum_reparametrize__seed1
+[slot 3 | gpu 5] -> sac__sanity_invertedpendulum_reparametrize__seed2
+[slot 6 | gpu 6] -> sac__sanity_invertedpendulum_reparametrize__seed3
+[slot 4 | gpu 5] -> sac__hopper__seed1
+[slot 5 | gpu 5] -> sac__hopper__seed2
+[slot 8 | gpu 6] -> sac__hopper__seed3
+[slot 4 | gpu 5] -> sac__hopper_doubleq__seed1
+[slot 5 | gpu 5] -> sac__hopper_doubleq__seed2
+[slot 8 | gpu 6] -> sac__hopper_doubleq__seed3
+[slot 9 | gpu 7] -> sac__hopper_clipq__seed1
+[slot 10 | gpu 7] -> sac__hopper_clipq__seed2
+[slot 11 | gpu 7] -> sac__hopper_clipq__seed3
+[slot 4 | gpu 5] -> sac__halfcheetah_reparametrize__seed1
+[slot 5 | gpu 5] -> sac__halfcheetah_reparametrize__seed2
+[slot 8 | gpu 6] -> sac__halfcheetah_reparametrize__seed3
+[slot 2 | gpu 4] -> sac__halfcheetah_reinforce1__seed1
+[slot 0 | gpu 4] -> sac__halfcheetah_reinforce1__seed2
+[slot 1 | gpu 4] -> sac__halfcheetah_reinforce1__seed3
+[slot 11 | gpu 7] -> sac__halfcheetah_reinforce10__seed1
+[slot 10 | gpu 7] -> sac__halfcheetah_reinforce10__seed2
+[slot 9 | gpu 7] -> sac__halfcheetah_reinforce10__seed3
+[slot 7 | gpu 6] -> sac__halfcheetah_clipq__seed1
+[slot 3 | gpu 5] -> sac__halfcheetah_clipq__seed2
+[slot 6 | gpu 6] -> sac__halfcheetah_clipq__seed3
+[slot 5 | gpu 5] -> sac__halfcheetah_doubleq__seed1
+[slot 4 | gpu 5] -> sac__halfcheetah_doubleq__seed2
+[slot 8 | gpu 6] -> sac__halfcheetah_doubleq__seed3
+[slot 0 | gpu 4] -> dqn__mspacman__seed1
+experiments/launch_all.sh: line 172: 3887676 Aborted                 (core dumped) python "$script" --config_file "$cfg" --seed "$seed" --which_gpu 0 "${wandb_args[@]}" > "$logfile" 2>&1
+[slot 0 | gpu 4] -> dqn__mspacman__seed2
+experiments/launch_all.sh: line 172: 3888372 Aborted                 (core dumped) python "$script" --config_file "$cfg" --seed "$seed" --which_gpu 0 "${wandb_args[@]}" > "$logfile" 2>&1
+[slot 0 | gpu 4] -> dqn__mspacman__seed3
+All tasks launched. Waiting for in-flight runs to finish...
+experiments/launch_all.sh: line 172: 3889016 Aborted                 (core dumped) python "$script" --config_file "$cfg" --seed "$seed" --which_gpu 0 "${wandb_args[@]}" > "$logfile" 2>&1
+Done. Logs: /data/wmz5132/cs285-study/hw3/experiments/launch_logs/20260420_221318
