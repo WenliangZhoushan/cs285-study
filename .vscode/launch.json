@@ -2,6 +2,22 @@
     "version": "0.2.0",
     "configurations": [
       {
+        "name": "hw3 dqn mspacman",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "cs285.scripts.run_hw3_dqn",
+        "args": [
+          "-cfg", "experiments/dqn/mspacman.yaml",
+          "--seed", "1"
+        ],
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}/hw3",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/hw3/cs285/scripts",
+          "LD_LIBRARY_PATH": "/data/wmz5132/anaconda3/envs/cs285/lib:/data/wmz5132/anaconda3/envs/cs285/lib/python3.9/site-packages/torch/lib:/usr/lib/x86_64-linux-gnu"
+        }
+      },
+      {
         "name": "hw1",
         "type": "debugpy",
         "request": "launch",
