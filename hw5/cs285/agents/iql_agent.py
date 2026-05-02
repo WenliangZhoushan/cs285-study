@@ -1,9 +1,8 @@
-from typing import Optional
 import torch
 from torch import nn
 from hw5.cs285.agents.awac_agent import AWACAgent
 
-from typing import Callable, Optional, Sequence, Tuple, List
+from typing import Callable, Optional, Sequence, Tuple
 
 
 class IQLAgent(AWACAgent):
@@ -37,8 +36,13 @@ class IQLAgent(AWACAgent):
         actions: torch.Tensor,
         action_dist: Optional[torch.distributions.Categorical] = None,
     ):
-        # TODO(student): Compute advantage with IQL
-        return ...
+        with torch.no_grad():
+            qa_values = self.critic(observations)
+            q_values = qa_values.gather(1, actions.unsqueeze(1).long()).squeeze(1)
+            vs = self.value_critic(observations).squeeze(-1)
+            advantages = q_values - vs
+
+        return advantages
 
     def update_q(
         self,
@@ -51,8 +55,13 @@ class IQLAgent(AWACAgent):
         """
         Update Q(s, a)
         """
-        # TODO(student): Update Q(s, a) to match targets (based on V)
-        loss = ...
+        with torch.no_grad():
+            next_vs = self.target_value_critic(next_observations).squeeze(-1)
+            target_values = rewards + self.discount * (1 - dones.float()) * next_vs
+
+        qa_values = self.critic(observations)
+        q_values = qa_values.gather(1, actions.unsqueeze(1).long()).squeeze(1)
+        loss = self.critic_loss(q_values, target_values)
 
         self.critic_optimizer.zero_grad()
         loss.backward()
@@ -60,6 +69,7 @@ class IQLAgent(AWACAgent):
             self.critic.parameters(), self.clip_grad_norm or float("inf")
         )
         self.critic_optimizer.step()
+        self.lr_scheduler.step()
 
         metrics = {
             "q_loss": self.critic_loss(q_values, target_values).item(),
@@ -77,8 +87,13 @@ class IQLAgent(AWACAgent):
         """
         Compute the expectile loss for IQL
         """
-        # TODO(student): Compute the expectile loss
-        return ...
+        diff = target_qs - vs
+        weights = torch.where(
+            diff > 0,
+            torch.full_like(diff, expectile),
+            torch.full_like(diff, 1 - expectile),
+        )
+        return (weights * diff.pow(2)).mean()
 
     def update_v(
         self,
@@ -88,10 +103,12 @@ class IQLAgent(AWACAgent):
         """
         Update the value network V(s) using targets Q(s, a)
         """
-        # TODO(student): Compute target values for V(s)
+        with torch.no_grad():
+            target_qa_values = self.target_critic(observations)
+            target_values = target_qa_values.gather(1, actions.unsqueeze(1).long()).squeeze(1)
 
-        # TODO(student): Update V(s) using the loss from the IQL paper
-        loss = ...
+        vs = self.value_critic(observations).squeeze(-1)
+        loss = self.iql_expectile_loss(self.expectile, vs, target_values)
 
         self.value_critic_optimizer.zero_grad()
         loss.backward()

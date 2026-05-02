@@ -46,9 +46,11 @@ class DQNAgent(nn.Module):
         """
         observation = ptu.from_numpy(np.asarray(observation))[None]
 
-        # TODO(student): get the action from the critic using an epsilon-greedy strategy
-        raise NotImplementedError
-        action = ...
+        if np.random.random() < epsilon:
+            return np.random.randint(self.num_actions)
+
+        with torch.no_grad():
+            action = self.critic(observation).argmax(dim=-1)
 
         return ptu.to_numpy(action).squeeze(0).item()
 
@@ -69,21 +71,27 @@ class DQNAgent(nn.Module):
          - variables: dict, a dictionary of variables that can be used in subsequent calculations
         """
 
-        # TODO(student): paste in your code from HW3, and make sure the return values exist
-        raise NotImplementedError
+        (batch_size,) = reward.shape
+
         with torch.no_grad():
-            next_qa_values = ...
+            next_qa_values = self.target_critic(next_obs)
 
             if self.use_double_q:
-                next_action = ...
+                next_action = self.critic(next_obs).argmax(dim=-1)
             else:
-                next_action = ...
+                next_action = next_qa_values.argmax(dim=-1)
 
-            next_q_values = ...
+            next_q_values = next_qa_values.gather(1, next_action.unsqueeze(1)).squeeze(1)
             assert next_q_values.shape == (batch_size,), next_q_values.shape
 
-            target_values = ...
+            target_values = reward + self.discount * (1 - done.float()) * next_q_values
             assert target_values.shape == (batch_size,), target_values.shape
+
+        qa_values = self.critic(obs)
+        q_values = qa_values.gather(1, action.unsqueeze(1).long()).squeeze(1)
+        assert q_values.shape == (batch_size,), q_values.shape
+
+        loss = self.critic_loss(q_values, target_values)
 
         return (
             loss,
@@ -136,6 +144,9 @@ class DQNAgent(nn.Module):
         """
         Update the DQN agent, including both the critic and target.
         """
-        # TODO(student): paste in your code from HW3
+        critic_stats = self.update_critic(obs, action, reward, next_obs, done)
+
+        if step % self.target_update_period == 0:
+            self.update_target_critic()
 
         return critic_stats

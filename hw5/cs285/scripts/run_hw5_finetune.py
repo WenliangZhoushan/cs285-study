@@ -46,20 +46,61 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
 
     ep_len = env.spec.max_episode_steps or env.max_episode_steps
 
-    observation = None
+    env_pointmass: Pointmass = env.unwrapped
 
     # Replay buffer
     replay_buffer = ReplayBuffer(capacity=config["total_steps"])
+
+    with open(os.path.join(args.dataset_dir, f"{config['dataset_name']}.pkl"), "rb") as f:
+        offline_dataset = pickle.load(f)
+
+    offline_size = min(offline_dataset.size, offline_dataset.max_size)
+    for i in range(offline_size):
+        replay_buffer.insert(
+            observation=offline_dataset.observations[i],
+            action=offline_dataset.actions[i],
+            reward=offline_dataset.rewards[i],
+            next_observation=offline_dataset.next_observations[i],
+            done=offline_dataset.dones[i],
+        )
 
     observation = env.reset()
 
     recent_observations = []
 
     num_offline_steps = config["offline_steps"]
-    num_online_steps = config["total_steps"] - num_offline_steps
 
     for step in tqdm.trange(config["total_steps"], dynamic_ncols=True):
-        # TODO(student): Borrow code from another online training script here. Only run the online training loop after `num_offline_steps` steps.
+        epsilon = None
+
+        if step >= num_offline_steps:
+            if exploration_schedule is not None:
+                epsilon = exploration_schedule.value(step - num_offline_steps)
+                action = agent.get_action(observation, epsilon)
+            else:
+                action = agent.get_action(observation)
+
+            next_observation, reward, done, info = env.step(action)
+            next_observation = np.asarray(next_observation)
+
+            truncated = info.get("TimeLimit.truncated", False)
+
+            replay_buffer.insert(
+                observation=observation,
+                action=action,
+                reward=reward,
+                done=done and not truncated,
+                next_observation=next_observation,
+            )
+            recent_observations.append(observation)
+
+            if done:
+                observation = env.reset()
+
+                logger.log_scalar(info["episode"]["r"], "train_return", step)
+                logger.log_scalar(info["episode"]["l"], "train_ep_len", step)
+            else:
+                observation = next_observation
 
         # Main training loop
         batch = replay_buffer.sample(config["batch_size"])
@@ -70,7 +111,7 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
         update_info = agent.update(
             batch["observations"],
             batch["actions"],
-            batch["rewards"] * (1 if config.get("use_reward", False) else 0),
+            batch["rewards"] * (1 if config.get("use_reward", True) else 0),
             batch["next_observations"],
             batch["dones"],
             step,
@@ -107,8 +148,7 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
                 logger.log_scalar(np.max(ep_lens), "eval/ep_len_max", step)
                 logger.log_scalar(np.min(ep_lens), "eval/ep_len_min", step)
 
-        if step % args.visualize_interval == 0:
-            env_pointmass: Pointmass = env.unwrapped
+        if step % args.visualize_interval == 0 and recent_observations:
             observations = np.stack(recent_observations)
             recent_observations = []
             logger.log_figure(
@@ -119,16 +159,19 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
             )
 
     # Save the final dataset
-    dataset_file = os.path.join(args.dataset_dir, f"{config['dataset_name']}.pkl")
+    dataset_file = os.path.join(args.dataset_dir, f"{config['log_name']}_finetune.pkl")
     with open(dataset_file, "wb") as f:
         pickle.dump(replay_buffer, f)
         print("Saved dataset to", dataset_file)
 
     # Render final heatmap
     fig = visualize(
-        env_pointmass, agent, replay_buffer.observations[: config["total_steps"]]
+        env_pointmass,
+        agent,
+        replay_buffer.observations[: min(replay_buffer.size, replay_buffer.max_size)],
     )
     fig.suptitle("State coverage")
+    os.makedirs("exploration", exist_ok=True)
     filename = os.path.join("exploration", f"{config['log_name']}.png")
     fig.savefig(filename)
     print("Saved final heatmap to", filename)
