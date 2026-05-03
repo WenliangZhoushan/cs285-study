@@ -32,6 +32,59 @@
         ],
         "console": "integratedTerminal",
         "cwd": "${workspaceFolder}/hw1"
+      },
+      {
+        "name": "offline_rl: collect data (debug)",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "offline_rl.collect_data",
+        "args": [
+          "--n", "5000",
+          "--expert-frac", "0.7",
+          "--expert-noise", "0.5",
+          "--seed", "0",
+          "--out", "offline_rl/data/pendulum_debug.npz"
+        ],
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "justMyCode": true
+      },
+      {
+        "name": "offline_rl: train IQL (debug)",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "offline_rl.train_iql",
+        "args": [
+          "--data", "offline_rl/data/pendulum_debug.npz",
+          "--steps", "2000",
+          "--batch-size", "256",
+          "--eval-every", "500",
+          "--eval-episodes", "2",
+          "--seed", "0",
+          "--device", "cpu"
+        ],
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "justMyCode": true
+      },
+      {
+        "name": "offline_rl: train CQL (debug)",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "offline_rl.train_cql",
+        "args": [
+          "--data", "offline_rl/data/pendulum_debug.npz",
+          "--steps", "2000",
+          "--batch-size", "256",
+          "--eval-every", "500",
+          "--eval-episodes", "2",
+          "--seed", "0",
+          "--device", "cpu",
+          "--cql-n-samples", "4"
+        ],
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "justMyCode": true
       }
     ]
 }

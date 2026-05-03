@@ -88,6 +88,6 @@ if __name__ == "__main__":
     parser.add_argument("--expert-frac", type=float, default=0.7)
     parser.add_argument("--expert-noise", type=float, default=0.5)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--out", type=str, default="offline_rl/data/pendulum_mixed.npz")
+    parser.add_argument("--out", type=str, default="data/pendulum_mixed.npz")
     args = parser.parse_args()
     collect(args.n, args.expert_frac, args.expert_noise, args.seed, args.out)

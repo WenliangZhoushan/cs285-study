@@ -15,8 +15,8 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 
-from offline_rl.networks import TanhGaussianActor, TwinQ, ValueCritic
-from offline_rl.utils import soft_update
+from networks import TanhGaussianActor, TwinQ, ValueCritic
+from utils import soft_update
 
 
 @dataclass

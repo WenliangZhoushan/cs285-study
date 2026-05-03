@@ -6,14 +6,14 @@ import gymnasium as gym
 import numpy as np
 import torch
 
-from offline_rl.cql import CQLAgent, CQLConfig
-from offline_rl.replay_buffer import ReplayBuffer
-from offline_rl.utils import evaluate, set_seed
+from cql import CQLAgent, CQLConfig
+from replay_buffer import ReplayBuffer
+from utils import evaluate, set_seed
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", type=str, default="offline_rl/data/pendulum_mixed.npz")
+    parser.add_argument("--data", type=str, default="data/pendulum_mixed.npz")
     parser.add_argument("--steps", type=int, default=50_000)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--eval-every", type=int, default=5_000)
